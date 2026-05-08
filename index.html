@@ -1053,8 +1053,8 @@ ${section.content.substring(0, 4000)}`;
               headers: { 'Content-Type':'application/json', 'Authorization': auth ? 'Basic ' + auth : 'Bearer ' + token },
               body: JSON.stringify({
                 type: { name: 'Parent' },
-                inwardIssue: { key: data.key },
-                outwardIssue: { key: parentKey }
+                inwardIssue: { key: parentKey },
+                outwardIssue: { key: data.key }
               })
             });
           } catch(e) {
