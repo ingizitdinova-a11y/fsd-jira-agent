@@ -767,25 +767,36 @@
 
   function parseJson(raw) {
     raw = raw.replace(/```json|```/g, '').trim();
-    // Fix unescaped control characters inside JSON strings
-    raw = raw.replace(/("(?:[^"\\]|\\.)*")|([\x00-\x1f])/g, (match, str, ctrl) => {
-      if (str) return str; // inside a string — leave as-is (already handled)
-      return ''; // outside a string — strip control char
-    });
-    // Fix unescaped newlines/tabs inside string values
-    raw = raw.replace(/"((?:[^"\\]|\\.)*)"/g, (match) => {
-      return match
-        .replace(/\n/g, '\\n')
-        .replace(/\r/g, '\\r')
-        .replace(/\t/g, '\\t');
-    });
-    try {
-      return JSON.parse(raw);
-    } catch(e) {
-      // Last resort: remove all control chars and retry
-      const cleaned = raw.replace(/[\x00-\x1f\x7f]/g, ' ');
-      return JSON.parse(cleaned);
+    // Remove all real control characters (\x00-\x1f) except valid JSON whitespace
+    // by processing character by character inside/outside strings
+    let result = '';
+    let inString = false;
+    let i = 0;
+    while (i < raw.length) {
+      const ch = raw[i];
+      if (inString) {
+        if (ch === '\\') {
+          result += ch + (raw[i+1] || '');
+          i += 2;
+          continue;
+        }
+        if (ch === '"') { inString = false; result += ch; i++; continue; }
+        const code = ch.charCodeAt(0);
+        if (code < 0x20) {
+          // Replace bare control char with escaped version
+          if (code === 10) result += '\\n';
+          else if (code === 13) result += '\\r';
+          else if (code === 9) result += '\\t';
+          else result += ' ';
+          i++; continue;
+        }
+        result += ch; i++;
+      } else {
+        if (ch === '"') { inString = true; }
+        result += ch; i++;
+      }
     }
+    return JSON.parse(result);
   }
 
   function showCacheBanner(preview) {
