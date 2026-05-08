@@ -681,12 +681,13 @@
     // 1. Markdown: ## Heading
     // 2. Numbered: 14.3 Title, 14.3.1 Title
     // 3. Word bold headings: lines that are short (<80 chars), not part of a table, followed by content
-    const isHeading = (line, nextLine) => {
+    const isHeading = (line) => {
       const trimmed = line.trim();
       if (!trimmed) return false;
-      if (/^#{1,4} /.test(trimmed)) return true; // markdown
-      if (/^\d+(\.\d+){0,3}\s+[A-ZА-Я]/.test(trimmed) && trimmed.length < 100) return true; // numbered
-      if (/^(\d+\.)+\s/.test(trimmed) && trimmed.length < 100) return true; // 14.3.1 style
+      // Markdown headings: ## Title
+      if (/^#{1,4} /.test(trimmed)) return true;
+      // Multi-level numbered sections: 14.1 Title, 14.1.1 Title (NOT single "1. item")
+      if (/^\d+\.\d+(\.\d+)*\s+[A-ZА-ЯA-Za-zа-я]/.test(trimmed) && trimmed.length < 120) return true;
       return false;
     };
 
