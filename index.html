@@ -1026,18 +1026,13 @@ ${section.content.substring(0, 4000)}`;
             'Authorization': auth ? 'Basic ' + auth : 'Bearer ' + token
           },
           body: JSON.stringify({
-            fields: (() => {
-              const fields = {
-                project: { key: project },
-                summary: uc.title,
-                description: buildWikiMarkup(uc),
-                issuetype: { name: issueType },
-                priority: { name: uc.priority==='High'?'High':uc.priority==='Low'?'Low':'Medium' },
-              };
-              const parentKey = parseParentKey(document.getElementById('jiraParent').value);
-              if (parentKey) fields.parent = { key: parentKey };
-              return fields;
-            })()
+            fields: {
+              project: { key: project },
+              summary: uc.title,
+              description: buildWikiMarkup(uc),
+              issuetype: { name: issueType },
+              priority: { name: uc.priority==='High'?'High':uc.priority==='Low'?'Low':'Medium' },
+            }
           })
         });
 
@@ -1046,10 +1041,32 @@ ${section.content.substring(0, 4000)}`;
           throw new Error(err.errorMessages?.[0] || `HTTP ${resp.status}`);
         }
         const data = await resp.json();
+
+        // Link to parent if specified
+        const parentKey = parseParentKey(document.getElementById('jiraParent').value);
+        if (parentKey) {
+          try {
+            const linkTarget = `${jiraUrl}/rest/api/2/issueLink`;
+            const linkFetchUrl = proxyBase ? `${proxyBase}?target=${encodeURIComponent(linkTarget)}` : linkTarget;
+            await fetch(linkFetchUrl, {
+              method: 'POST',
+              headers: { 'Content-Type':'application/json', 'Authorization': auth ? 'Basic ' + auth : 'Bearer ' + token },
+              body: JSON.stringify({
+                type: { name: 'Hierarchy' },
+                inwardIssue: { key: data.key },
+                outwardIssue: { key: parentKey }
+              })
+            });
+          } catch(e) {
+            console.warn('Link failed:', e.message);
+          }
+        }
+
         row.innerHTML = `
           <svg class="icon-ok" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="9,12 12,15 16,9"/></svg>
           <span class="jira-key">${data.key}</span>
           <span style="flex:1;color:var(--text);">${uc.title}</span>
+          ${parentKey ? `<span style="font-size:11px;color:var(--text3);">→ ${parentKey}</span>` : ''}
           <a href="${jiraUrl}/browse/${data.key}" target="_blank" style="font-size:12px;color:var(--purple);">открыть ↗</a>`;
       } catch(e) {
         row.innerHTML = `
