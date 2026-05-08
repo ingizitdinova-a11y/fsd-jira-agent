@@ -684,10 +684,8 @@
     const isHeading = (line) => {
       const trimmed = line.trim();
       if (!trimmed) return false;
-      // Markdown headings: ## Title
+      // Only markdown headings # ## ### ####
       if (/^#{1,4} /.test(trimmed)) return true;
-      // Multi-level numbered sections: 14.1 Title, 14.1.1 Title (NOT single "1. item")
-      if (/^\d+\.\d+(\.\d+)*\s+[A-ZА-ЯA-Za-zа-я]/.test(trimmed) && trimmed.length < 120) return true;
       return false;
     };
 
