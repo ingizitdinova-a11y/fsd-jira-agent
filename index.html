@@ -364,10 +364,13 @@
       <span class="nav-dot" id="dot2">2</span> FSD документ
     </button>
     <button class="nav-item" id="nav3" onclick="goStep(3)">
-      <span class="nav-dot" id="dot3">3</span> Use cases
+      <span class="nav-dot" id="dot3">3</span> Разделы
     </button>
     <button class="nav-item" id="nav4" onclick="goStep(4)">
-      <span class="nav-dot" id="dot4">4</span> Создать в Jira
+      <span class="nav-dot" id="dot4">4</span> Use cases
+    </button>
+    <button class="nav-item" id="nav5" onclick="goStep(5)">
+      <span class="nav-dot" id="dot5">5</span> Создать в Jira
     </button>
     <div class="nav-divider"></div>
     <div style="font-size:12px;color:var(--text3);padding:0 12px;line-height:1.6;">
@@ -503,8 +506,38 @@
       </div>
     </div>
 
-    <!-- STEP 3 -->
-    <div class="panel" id="panel3">
+    <!-- STEP 3: Sections review -->
+    <div class="panel" id="panel4">
+      <div class="page-title">Разделы документа</div>
+      <div class="page-sub">Проверь все ли нужные разделы попали в обработку. Сними галочку с разделов которые не нужно обрабатывать.</div>
+
+      <div class="stats-grid" id="secStatsGrid" style="display:none">
+        <div class="stat"><div class="stat-num" id="secStatTotal">0</div><div class="stat-lbl">разделов</div></div>
+        <div class="stat"><div class="stat-num" id="secStatSelected">0</div><div class="stat-lbl">выбрано</div></div>
+        <div class="stat"><div class="stat-num" id="secStatChars">0</div><div class="stat-lbl">KB текста</div></div>
+      </div>
+
+      <button class="select-toggle" onclick="toggleAllSections()" id="toggleAllSecBtn" style="display:none">
+        ☐ <span id="toggleAllSecTxt">Выбрать все</span>
+      </button>
+
+      <div class="uc-list" id="secList">
+        <div class="card" style="text-align:center;color:var(--text3);font-size:14px;padding:3rem;">
+          Сначала загрузи FSD на шаге 2
+        </div>
+      </div>
+
+      <div class="actions" id="step3SecActions" style="display:none">
+        <button class="btn" onclick="goStep(2)">← Назад</button>
+        <button class="btn btn-primary" onclick="startExtraction()">
+          ✦ Извлечь use cases из выбранных разделов →
+        </button>
+        <span class="status" id="secExtractStatus"></span>
+      </div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="panel" id="panel4">
       <div class="page-title">Use cases</div>
       <div class="page-sub">Проверь и выбери задачи для создания в Jira.</div>
 
@@ -531,7 +564,7 @@
     </div>
 
     <!-- STEP 4 -->
-    <div class="panel" id="panel4">
+    <div class="panel" id="panel5">
       <div class="page-title">Создать в Jira</div>
       <div class="page-sub" id="jiraPreviewText">Готово к отправке.</div>
 
@@ -601,15 +634,16 @@
   function goStep(n) {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel' + n).classList.add('active');
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= 5; i++) {
       const nav = document.getElementById('nav' + i);
       const dot = document.getElementById('dot' + i);
+      if (!nav) continue;
       nav.classList.remove('active','done');
       if (i < n) { nav.classList.add('done'); dot.innerHTML = '✓'; }
       else if (i === n) { nav.classList.add('active'); dot.textContent = i; }
       else { dot.textContent = i; }
     }
-    if (n === 4) renderJiraPreview();
+    if (n === 5) renderJiraPreview();
   }
 
   async function handleFile(input) {
@@ -793,29 +827,73 @@ FSD section («${section.title}»):
 ${section.content.substring(0, 4000)}`;
   }
 
-  async function extractUseCases() {
-    const key = document.getElementById('anthropicKey').value.trim();
-    const fsd = document.getElementById('fsdText').value.trim();
-    if (!key) { setStatus('extractStatus', 'Укажи Anthropic API key на шаге 1', 'error'); return; }
-    if (!fsd) { setStatus('extractStatus', 'Вставь текст FSD', 'error'); return; }
+  let sections = [];
+  let selectedSections = new Set();
 
-    const btn = document.getElementById('extractBtn');
+  function renderSections(secs) {
+    sections = secs;
+    selectedSections = new Set(secs.map((_, i) => i));
+
+    document.getElementById('secStatsGrid').style.display = 'grid';
+    document.getElementById('toggleAllSecBtn').style.display = 'inline-flex';
+    document.getElementById('step3SecActions').style.display = 'flex';
+    updateSecStats();
+
+    const list = document.getElementById('secList');
+    list.innerHTML = secs.map((s, i) => `
+      <div class="uc-card selected" id="seccard${i}">
+        <div class="uc-header">
+          <div class="uc-check checked" onclick="toggleSection(${i})" id="seccheck${i}">
+            <svg width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2" fill="none"/></svg>
+          </div>
+          <div class="uc-title" style="font-size:13px;">${s.title}</div>
+          <span class="tag">${Math.round(s.content.length/1000 * 10)/10}KB</span>
+        </div>
+      </div>`).join('');
+  }
+
+  function toggleSection(i) {
+    selectedSections.has(i) ? selectedSections.delete(i) : selectedSections.add(i);
+    const card = document.getElementById('seccard' + i);
+    const check = document.getElementById('seccheck' + i);
+    card.classList.toggle('selected', selectedSections.has(i));
+    check.className = 'uc-check' + (selectedSections.has(i) ? ' checked' : '');
+    check.innerHTML = selectedSections.has(i) ? '<svg width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2" fill="none"/></svg>' : '';
+    updateSecStats();
+  }
+
+  function toggleAllSections() {
+    if (selectedSections.size === sections.length) selectedSections.clear();
+    else sections.forEach((_, i) => selectedSections.add(i));
+    renderSections(sections);
+  }
+
+  function updateSecStats() {
+    document.getElementById('secStatTotal').textContent = sections.length;
+    document.getElementById('secStatSelected').textContent = selectedSections.size;
+    const kb = Math.round([...selectedSections].reduce((sum, i) => sum + sections[i].content.length, 0) / 1024);
+    document.getElementById('secStatChars').textContent = kb;
+    document.getElementById('toggleAllSecTxt').textContent = selectedSections.size === sections.length ? 'Снять все' : 'Выбрать все';
+  }
+
+  async function startExtraction() {
+    const key = document.getElementById('anthropicKey').value.trim();
+    if (!key) { setStatus('secExtractStatus', 'Укажи Anthropic API key на шаге 1', 'error'); return; }
+
+    const toProcess = sections.filter((_, i) => selectedSections.has(i));
+    if (!toProcess.length) { setStatus('secExtractStatus', 'Выбери хотя бы один раздел', 'error'); return; }
+
+    const btn = document.querySelector('#step3SecActions .btn-primary');
     btn.disabled = true;
     useCases = [];
 
     try {
-      // Split FSD into sections
-      const sections = splitIntoSections(fsd);
-      setStatus('extractStatus', `Найдено ${sections.length} разделов. Обрабатываю...`, 'loading');
-
       let allUC = [];
-      for (let i = 0; i < sections.length; i++) {
-        const section = sections[i];
-        setStatus('extractStatus', `Раздел ${i+1}/${sections.length}: «${section.title.substring(0,40)}»...`, 'loading');
-
+      for (let i = 0; i < toProcess.length; i++) {
+        const section = toProcess[i];
+        setStatus('secExtractStatus', `Раздел ${i+1}/${toProcess.length}: «${section.title.substring(0,35)}»...`, 'loading');
         const { text, truncated } = await callClaude(key, makeSectionPrompt(section), 2048);
         if (truncated) console.warn(`Section ${i+1} truncated`);
-
         try {
           const parsed = parseJson(text);
           const ucs = (parsed.use_cases || []).filter(u => u.title && u.title.trim());
@@ -828,11 +906,31 @@ ${section.content.substring(0, 4000)}`;
 
       useCases = allUC;
       selected = new Set(useCases.map((_, i) => i));
-      // Save to cache
       localStorage.setItem('fsd_cached_uc', JSON.stringify(useCases));
-      localStorage.setItem('fsd_cached_fsd', fsd.substring(0, 200));
+      localStorage.setItem('fsd_cached_fsd', document.getElementById('fsdText').value.substring(0, 200));
       renderUseCases();
-      setStatus('extractStatus', `Готово: ${useCases.length} use cases ✓`, 'success');
+      setStatus('secExtractStatus', `Готово: ${useCases.length} сценариев ✓`, 'success');
+      goStep(4);
+    } catch(e) {
+      setStatus('secExtractStatus', 'Ошибка: ' + e.message, 'error');
+    }
+    btn.disabled = false;
+  }
+
+  async function extractUseCases() {
+    const key = document.getElementById('anthropicKey').value.trim();
+    const fsd = document.getElementById('fsdText').value.trim();
+    if (!key) { setStatus('extractStatus', 'Укажи Anthropic API key на шаге 1', 'error'); return; }
+    if (!fsd) { setStatus('extractStatus', 'Вставь текст FSD', 'error'); return; }
+
+    const btn = document.getElementById('extractBtn');
+    btn.disabled = true;
+
+    try {
+      // Split into sections and show review screen
+      const secs = splitIntoSections(fsd);
+      setStatus('extractStatus', `Найдено ${secs.length} разделов ✓`, 'success');
+      renderSections(secs);
       goStep(3);
     } catch(e) {
       setStatus('extractStatus', 'Ошибка: ' + e.message, 'error');
