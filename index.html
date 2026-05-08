@@ -710,30 +710,32 @@
   }
 
   function makeSectionPrompt(section) {
-    return `Ты — аналитик требований. Прочитай этот раздел FSD и извлеки бизнес-сценарии.
+    return `You are a business analyst. Read this FSD section and extract business scenarios.
 
-Бизнес-сценарий = полный пользовательский флоу с бизнес-ценностью. Правила:
-- Один wizard/флоу = один сценарий (не дроби по полям или кликам)
-- Название отражает бизнес-цель, не технический шаг
-- Если раздел не содержит сценариев — верни пустой массив
+IMPORTANT: Write ALL fields (title, description, actor, preconditions, steps, expected_result) in the SAME LANGUAGE as the FSD source text. Do not translate.
 
-Верни ТОЛЬКО JSON без markdown:
+A business scenario = a complete user flow with business value. Rules:
+- One wizard/flow = one scenario (do NOT split by fields or clicks)
+- Title reflects the business goal, not a technical step
+- If the section contains no scenarios, return an empty array
+
+Return ONLY JSON without markdown:
 {"use_cases": [
   {
-    "title": "Название сценария (до 60 символов)",
+    "title": "Scenario title (max 60 chars, same language as FSD)",
     "section": "${section.title}",
-    "description": "Полное описание флоу — контекст, все шаги, взаимодействия. Минимум 2-3 предложения.",
-    "actor": "Роль пользователя",
-    "preconditions": "Предусловия или пустая строка",
-    "steps": ["Шаг 1 со всеми деталями", "Шаг 2", "Шаг 3"],
-    "expected_result": "Результат для пользователя",
+    "description": "Full flow description — context, all steps, interactions. Min 2-3 sentences. Same language as FSD.",
+    "actor": "User role (same language as FSD)",
+    "preconditions": "Preconditions or empty string",
+    "steps": ["Step 1 with all details", "Step 2", "Step 3"],
+    "expected_result": "Result for the user",
     "priority": "High"
   }
 ]}
 
 priority = High | Medium | Low
 
-Раздел FSD («${section.title}»):
+FSD section («${section.title}»):
 ${section.content.substring(0, 4000)}`;
   }
 
