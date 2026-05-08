@@ -826,35 +826,23 @@
   }
 
   function makeSectionPrompt(section) {
+    const title = section.title;
+    const body = section.content.substring(0, 4000);
     return `You are a business analyst. Read this FSD section and extract business scenarios.
 
-IMPORTANT: Write ALL fields (title, description, actor, preconditions, steps, expected_result) in the SAME LANGUAGE as the FSD source text. Do not translate.
+CRITICAL: Write ALL output fields in the SAME LANGUAGE as the FSD text. English FSD = English output. Russian FSD = Russian output. NEVER translate.
 
 A business scenario = a complete user flow with business value. Rules:
-- One wizard/flow = one scenario (do NOT split by fields or clicks)
-- Title reflects the business goal, not a technical step
-- If the section contains no scenarios, return an empty array
+- One wizard/flow = one scenario, do NOT split by fields or clicks
+- Title reflects business goal, not a technical step
+- If no user-facing scenarios exist, return: {"use_cases": []}
 
-Return ONLY JSON without markdown:
-{"use_cases": [
-  {
-    "title": "Scenario title (max 60 chars, same language as FSD)",
-    "section": "${section.title}",
-    "description": "Full flow description — context, all steps, interactions. Min 2-3 sentences. Same language as FSD.",
-    "actor": "User role (same language as FSD)",
-    "preconditions": "Preconditions or empty string",
-    "steps": ["Step 1 with all details", "Step 2", "Step 3"],
-    "expected_result": "Result for the user",
-    "priority": "High"
+Return ONLY valid JSON without markdown or explanation.
+JSON schema: title (max 60 chars), section, description (min 2-3 sentences), actor, preconditions, steps (array of strings), expected_result, priority (High/Medium/Low)
+
+FSD section ("` + title + `"):
+` + body;
   }
-]}
-
-priority = High | Medium | Low
-
-FSD section («${section.title}»):
-${section.content.substring(0, 4000)}`;
-  }
-
   let sections = [];
   let selectedSections = new Set();
 
