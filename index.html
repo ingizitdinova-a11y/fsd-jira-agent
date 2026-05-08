@@ -939,7 +939,7 @@ ${fsd.substring(0, 25000)}`;
               description: buildWikiMarkup(uc),
               issuetype: { name: issueType },
               priority: { name: uc.priority==='High'?'High':uc.priority==='Low'?'Low':'Medium' },
-              labels: (uc.labels||[]).filter(l=>/^[a-zA-Z0-9_\-]+$/.test(l))
+              // labels excluded — not available on this Jira screen
             }
           })
         });
