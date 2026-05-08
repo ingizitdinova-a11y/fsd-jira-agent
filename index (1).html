@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FSD → Jira Agent</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --border: rgba(0,0,0,0.1);
+    --border2: rgba(0,0,0,0.18);
+    --text: #1a1a18;
+    --text2: #6b6b64;
+    --text3: #9b9b92;
+    --purple: #6c63d4;
+    --purple-dark: #4a43a0;
+    --purple-light: #eeedfc;
+    --green: #1d9e75;
+    --green-light: #e1f5ee;
+    --amber: #b87515;
+    --amber-light: #faeeda;
+    --red: #c94040;
+    --red-light: #fcebeb;
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  /* Header */
+  header {
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border);
+    padding: 0 2rem;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .logo {
+    width: 28px; height: 28px;
+    background: var(--purple);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  header h1 { font-size: 15px; font-weight: 600; }
+  header span { font-size: 13px; color: var(--text3); margin-left: auto; }
+
+  /* Layout */
+  .layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    min-height: calc(100vh - 56px);
+  }
+
+  /* Sidebar */
+  aside {
+    background: var(--surface);
+    border-right: 0.5px solid var(--border);
+    padding: 1.5rem 1rem;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text2);
+    transition: background 0.15s, color 0.15s;
+    margin-bottom: 2px;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--purple-light); color: var(--purple); font-weight: 500; }
+  .nav-item.done .nav-dot { background: var(--green); }
+  .nav-dot {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 1.5px solid var(--border2);
+    font-size: 11px;
+    font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    color: var(--text2);
+    transition: background 0.2s;
+  }
+  .nav-item.active .nav-dot { background: var(--purple); color: white; border-color: var(--purple); }
+  .nav-item.done .nav-dot { background: var(--green); color: white; border-color: var(--green); }
+
+  .nav-divider { height: 0.5px; background: var(--border); margin: 1rem 0; }
+
+  /* Main */
+  main {
+    padding: 2rem;
+    max-width: 760px;
+  }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text3);
+    margin-bottom: 1.25rem;
+  }
+
+  /* Form */
+  .field { margin-bottom: 1rem; }
+  .field:last-child { margin-bottom: 0; }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    margin-bottom: 5px;
+  }
+  input, textarea, select {
+    width: 100%;
+    padding: 9px 12px;
+    font-size: 14px;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+  }
+  input:focus, textarea:focus, select:focus {
+    border-color: var(--purple);
+    box-shadow: 0 0 0 3px rgba(108,99,212,0.1);
+  }
+  textarea { resize: vertical; min-height: 180px; line-height: 1.6; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 18px;
+    font-size: 14px; font-weight: 500;
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border2);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn:hover { background: var(--surface2); }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-primary { background: var(--purple); border-color: var(--purple-dark); color: white; }
+  .btn-primary:hover { background: var(--purple-dark); }
+  .btn-success { background: var(--green); border-color: #0f6e56; color: white; }
+  .btn-success:hover { background: #0f6e56; }
+  .actions { display: flex; align-items: center; gap: 10px; margin-top: 1.5rem; }
+
+  /* Status */
+  .status { font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .status.loading { color: var(--purple); }
+  .status.success { color: var(--green); }
+  .status.error { color: var(--red); }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 1.5px dashed var(--border2);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    color: var(--text2);
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .upload-zone:hover { background: var(--surface2); border-color: var(--purple); }
+  .upload-zone svg { display: block; margin: 0 auto 10px; opacity: 0.4; }
+  .upload-zone .hint { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+  .divider-text { text-align: center; font-size: 13px; color: var(--text3); margin: 1rem 0; position: relative; }
+  .divider-text::before, .divider-text::after {
+    content: '';
+    position: absolute; top: 50%; width: 45%;
+    height: 0.5px; background: var(--border);
+  }
+  .divider-text::before { left: 0; }
+  .divider-text::after { right: 0; }
+
+  /* Info box */
+  .info-box {
+    background: var(--purple-light);
+    border-left: 3px solid var(--purple);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #3c3489;
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+
+  /* Stats */
+  .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+  .stat {
+    background: var(--surface2);
+    border-radius: var(--radius);
+    padding: 12px;
+    text-align: center;
+  }
+  .stat-num { font-size: 24px; font-weight: 600; color: var(--text); }
+  .stat-lbl { font-size: 12px; color: var(--text3); margin-top: 2px; }
+
+  /* Use case cards */
+  .uc-list { display: flex; flex-direction: column; gap: 8px; }
+  .uc-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.25rem;
+    transition: border-color 0.15s;
+  }
+  .uc-card.selected { border-color: var(--purple); border-width: 1.5px; }
+  .uc-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
+  .uc-check {
+    width: 18px; height: 18px;
+    border: 1.5px solid var(--border2);
+    border-radius: 4px;
+    flex-shrink: 0; margin-top: 2px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface);
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .uc-check.checked { background: var(--purple); border-color: var(--purple); }
+  .uc-title { font-size: 14px; font-weight: 500; flex: 1; }
+  .badge {
+    font-size: 11px; font-weight: 500;
+    padding: 2px 8px; border-radius: 100px;
+    flex-shrink: 0;
+  }
+  .badge-high { background: var(--red-light); color: var(--red); }
+  .badge-medium { background: var(--amber-light); color: var(--amber); }
+  .badge-low { background: var(--green-light); color: var(--green); }
+  .uc-ref { font-size: 12px; color: var(--purple); margin: 0 0 4px 28px; font-style: italic; }
+  .uc-details { margin: 10px 0 4px 28px; border-top: 0.5px solid var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .uc-detail-row { display: grid; grid-template-columns: 120px 1fr; gap: 8px; font-size: 13px; align-items: start; }
+  .uc-detail-label { font-weight: 500; color: var(--text3); font-size: 12px; padding-top: 1px; }
+  .uc-steps { margin: 0; padding-left: 18px; color: var(--text2); line-height: 1.7; }
+  .uc-toggle { background: none; border: none; font-size: 12px; color: var(--purple); cursor: pointer; margin: 6px 0 0 28px; padding: 0; font-family: inherit; }
+  .uc-toggle:hover { text-decoration: underline; }
+  .uc-desc { font-size: 13px; color: var(--text2); line-height: 1.5; margin-left: 28px; }
+  .uc-meta { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 0 28px; }
+  .tag {
+    font-size: 11px;
+    background: var(--surface2);
+    color: var(--text3);
+    padding: 2px 8px; border-radius: 100px;
+    border: 0.5px solid var(--border);
+  }
+
+  /* Jira results */
+  .jira-results { display: flex; flex-direction: column; gap: 8px; }
+  .jira-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 13px;
+  }
+  .jira-key {
+    font-family: 'SF Mono', monospace;
+    font-size: 12px;
+    color: #185fa5;
+    font-weight: 600;
+  }
+
+  /* Spinner */
+  .spin {
+    width: 14px; height: 14px;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    display: inline-block; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Checkmark SVG */
+  .icon-ok { color: var(--green); flex-shrink: 0; }
+  .icon-fail { color: var(--red); flex-shrink: 0; }
+
+  /* Page title */
+  .page-title { font-size: 20px; font-weight: 600; margin-bottom: 0.25rem; }
+  .page-sub { font-size: 14px; color: var(--text2); margin-bottom: 1.5rem; }
+
+  .select-toggle {
+    font-size: 13px; color: var(--text2);
+    cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+    margin-bottom: 10px; background: none; border: none; font-family: inherit;
+  }
+  .select-toggle:hover { color: var(--text); }
+
+  .api-note {
+    font-size: 12px; color: var(--text3);
+    margin-top: 6px;
+    display: flex; align-items: center; gap: 4px;
+  }
+
+  @media (max-width: 640px) {
+    .layout { grid-template-columns: 1fr; }
+    aside { display: none; }
+    main { padding: 1rem; }
+    .row { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">F→J</div>
+  <h1>FSD → Jira Agent</h1>
+  <span>Delivery Team Tool</span>
+</header>
+
+<div class="layout">
+  <aside>
+    <button class="nav-item active" id="nav1" onclick="goStep(1)">
+      <span class="nav-dot" id="dot1">1</span> Настройка
+    </button>
+    <button class="nav-item" id="nav2" onclick="goStep(2)">
+      <span class="nav-dot" id="dot2">2</span> FSD документ
+    </button>
+    <button class="nav-item" id="nav3" onclick="goStep(3)">
+      <span class="nav-dot" id="dot3">3</span> Use cases
+    </button>
+    <button class="nav-item" id="nav4" onclick="goStep(4)">
+      <span class="nav-dot" id="dot4">4</span> Создать в Jira
+    </button>
+    <div class="nav-divider"></div>
+    <div style="font-size:12px;color:var(--text3);padding:0 12px;line-height:1.6;">
+      Ключи хранятся только в браузере и никуда не передаются
+    </div>
+  </aside>
+
+  <main>
+
+    <!-- STEP 1 -->
+    <div class="panel active" id="panel1">
+      <div class="page-title">Настройка</div>
+      <div class="page-sub">Введи ключи для Claude и Jira. Они сохраняются только локально в браузере.</div>
+
+      <div class="card">
+        <div class="card-title">Claude API</div>
+        <div class="field">
+          <label>Anthropic API Key</label>
+          <input type="password" id="anthropicKey" placeholder="sk-ant-api03-..." />
+          <div class="api-note">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8"/></svg>
+            Получить на <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--purple);">console.anthropic.com</a>
+          </div>
+        </div>
+        <div class="field">
+          <label>Cloudflare Worker URL <span style="color:var(--text3);font-weight:400;">(прокси для обхода CORS)</span></label>
+          <input type="text" id="proxyUrl" placeholder="https://your-worker.your-name.workers.dev" />
+          <div class="api-note">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8"/></svg>
+            Инструкция по созданию — в файле <code>worker.js</code>. Нужен для работы с Jira.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Jira</div>
+        <div class="field">
+          <label>Base URL</label>
+          <input type="text" id="jiraUrl" placeholder="https://your-org.atlassian.net" />
+        </div>
+        <div class="field">
+          <label>Тип авторизации</label>
+          <select id="jiraAuthType" onchange="updateAuthHint()">
+            <option value="cloud">Jira Cloud (email + API token)</option>
+            <option value="server">Jira Server / Data Center (Personal Access Token)</option>
+          </select>
+        </div>
+        <div class="field" id="emailField">
+          <label>Email</label>
+          <input type="email" id="jiraEmail" placeholder="you@company.com" />
+        </div>
+        <div class="field">
+          <label>Personal Access Token</label>
+          <input type="password" id="jiraToken" placeholder="Вставь токен" />
+          <div class="api-note">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8"/></svg>
+            <span id="authHintText">Jira Cloud: <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" style="color:var(--purple);">создать токен</a> &nbsp;|&nbsp; Jira Server: Profile → Personal Access Tokens</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Project Key</label>
+            <input type="text" id="jiraProject" placeholder="PROJ" />
+          </div>
+          <div class="field">
+            <label>Issue type</label>
+            <select id="jiraIssueType">
+              <option>Story</option>
+              <option>Task</option>
+              <option>Bug</option>
+              <option>Epic</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" onclick="saveAndNext()">Сохранить и продолжить →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="panel" id="panel2">
+      <div class="page-title">FSD документ</div>
+      <div class="page-sub">Загрузи файл или вставь текст. Claude извлечёт все use cases.</div>
+
+      <div id="cacheBanner" style="display:none;align-items:flex-start;gap:12px;background:var(--green-light);border:1px solid var(--green);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:1rem;">
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:500;color:var(--green);margin-bottom:4px;">✓ Найден кэш use cases</div>
+          <div style="font-size:12px;color:var(--text2);">FSD: <span id="cachePreview" style="font-style:italic;"></span></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0;">
+          <button class="btn btn-success" onclick="useCached()" style="font-size:13px;padding:6px 14px;">Использовать →</button>
+          <button class="btn" onclick="clearCache()" style="font-size:13px;padding:6px 14px;">Сбросить</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+          <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14,2 14,8 20,8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <polyline points="9,15 12,12 15,15"/>
+          </svg>
+          <div style="font-size:14px;font-weight:500;">Нажми для загрузки файла</div>
+          <div class="hint">.txt или .md</div>
+        </div>
+        <input type="file" id="fileInput" accept=".txt,.md" style="display:none" onchange="handleFile(this)" />
+
+        <div class="divider-text">или вставь текст</div>
+
+        <div class="field">
+          <label>Текст FSD</label>
+          <textarea id="fsdText" placeholder="Вставь содержимое FSD: описание системы, требования, use cases, user stories, функциональные блоки..."></textarea>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn" onclick="goStep(1)">← Назад</button>
+        <button class="btn btn-primary" onclick="extractUseCases()" id="extractBtn">
+          ✦ Извлечь use cases
+        </button>
+        <span class="status" id="extractStatus"></span>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="panel" id="panel3">
+      <div class="page-title">Use cases</div>
+      <div class="page-sub">Проверь и выбери задачи для создания в Jira.</div>
+
+      <div class="stats-grid" id="statsGrid" style="display:none">
+        <div class="stat"><div class="stat-num" id="statTotal">0</div><div class="stat-lbl">найдено</div></div>
+        <div class="stat"><div class="stat-num" id="statSel">0</div><div class="stat-lbl">выбрано</div></div>
+        <div class="stat"><div class="stat-num" id="statHigh">0</div><div class="stat-lbl">High priority</div></div>
+      </div>
+
+      <button class="select-toggle" onclick="toggleAll()" id="toggleAllBtn" style="display:none">
+        ☐ <span id="toggleAllTxt">Выбрать все</span>
+      </button>
+
+      <div class="uc-list" id="ucList">
+        <div class="card" style="text-align:center;color:var(--text3);font-size:14px;padding:3rem;">
+          Сначала загрузи FSD на шаге 2
+        </div>
+      </div>
+
+      <div class="actions" id="step3Actions" style="display:none">
+        <button class="btn" onclick="goStep(2)">← Назад</button>
+        <button class="btn btn-primary" onclick="goStep(4)">Перейти к созданию →</button>
+      </div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="panel" id="panel4">
+      <div class="page-title">Создать в Jira</div>
+      <div class="page-sub" id="jiraPreviewText">Готово к отправке.</div>
+
+      <div class="card">
+        <button class="btn btn-success" onclick="createIssues()" id="createBtn" style="width:100%;justify-content:center;padding:12px;">
+          ⬆ Создать задачи в Jira
+        </button>
+      </div>
+
+      <div class="jira-results" id="jiraResults"></div>
+
+      <div class="actions" style="margin-top:1rem;">
+        <button class="btn" onclick="goStep(3)">← Назад</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  let useCases = [];
+  let selected = new Set();
+
+  // Load saved settings
+  window.addEventListener('load', () => {
+    // Restore cached use cases
+    const cached = localStorage.getItem('fsd_cached_uc');
+    const cachedFsd = localStorage.getItem('fsd_cached_fsd');
+    if (cached) {
+      try {
+        useCases = JSON.parse(cached);
+        selected = new Set(useCases.map((_, i) => i));
+        showCacheBanner(cachedFsd);
+        renderUseCases();
+      } catch(e) { localStorage.removeItem('fsd_cached_uc'); }
+    }
+    ['anthropicKey','proxyUrl','jiraUrl','jiraEmail','jiraToken','jiraProject','jiraIssueType','jiraAuthType'].forEach(id => {
+      const val = localStorage.getItem('fsd_' + id);
+      if (val) document.getElementById(id).value = val;
+    });
+  });
+
+  function updateAuthHint() {
+    const type = document.getElementById('jiraAuthType').value;
+    const emailField = document.getElementById('emailField');
+    const hintText = document.getElementById('authHintText');
+    if (type === 'server') {
+      emailField.style.display = 'none';
+      hintText.innerHTML = 'Jira Server: Profile → Personal Access Tokens';
+    } else {
+      emailField.style.display = 'block';
+      hintText.innerHTML = 'Jira Cloud: <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" style="color:var(--purple);">создать токен</a>';
+    }
+  }
+
+  function saveSettings() {
+    ['anthropicKey','proxyUrl','jiraUrl','jiraEmail','jiraToken','jiraProject','jiraIssueType','jiraAuthType'].forEach(id => {
+      localStorage.setItem('fsd_' + id, document.getElementById(id).value);
+    });
+  }
+
+  function saveAndNext() {
+    saveSettings();
+    goStep(2);
+  }
+
+  function goStep(n) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel' + n).classList.add('active');
+    for (let i = 1; i <= 4; i++) {
+      const nav = document.getElementById('nav' + i);
+      const dot = document.getElementById('dot' + i);
+      nav.classList.remove('active','done');
+      if (i < n) { nav.classList.add('done'); dot.innerHTML = '✓'; }
+      else if (i === n) { nav.classList.add('active'); dot.textContent = i; }
+      else { dot.textContent = i; }
+    }
+    if (n === 4) renderJiraPreview();
+  }
+
+  function handleFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => { document.getElementById('fsdText').value = e.target.result; };
+    reader.readAsText(file);
+  }
+
+  async function callClaude(key, prompt, maxTokens) {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-5',
+        max_tokens: maxTokens || 1024,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error.message);
+    return { text: data.content[0].text, truncated: data.stop_reason === 'max_tokens' };
+  }
+
+  function parseJson(raw) {
+    raw = raw.replace(/```json|```/g, '').trim();
+    return JSON.parse(raw);
+  }
+
+  function showCacheBanner(preview) {
+    const banner = document.getElementById('cacheBanner');
+    const previewEl = document.getElementById('cachePreview');
+    if (banner) {
+      banner.style.display = 'flex';
+      if (preview && previewEl) previewEl.textContent = preview + '...';
+    }
+  }
+
+  function clearCache() {
+    localStorage.removeItem('fsd_cached_uc');
+    localStorage.removeItem('fsd_cached_fsd');
+    useCases = [];
+    selected = new Set();
+    document.getElementById('cacheBanner').style.display = 'none';
+    document.getElementById('ucList').innerHTML = '<div class="card" style="text-align:center;color:var(--text3);font-size:14px;padding:3rem;">Сначала загрузи FSD на шаге 2</div>';
+    document.getElementById('statsGrid').style.display = 'none';
+    document.getElementById('toggleAllBtn').style.display = 'none';
+    document.getElementById('step3Actions').style.display = 'none';
+    setStatus('extractStatus', '', '');
+    document.getElementById('fsdText').value = '';
+  }
+
+  function useCached() {
+    goStep(3);
+  }
+
+  async function fetchUcIndex(key, fsd) {
+    const prompt = `Ты — аналитик требований. Прочитай FSD и составь полный список use cases / user stories / функциональных требований.
+
+Верни ТОЛЬКО JSON без markdown:
+{"items": [{"title": "Краткое название (до 60 символов)", "section": "Номер и название раздела FSD, например: 3.2 Авторизация пользователя"}]}
+
+Включи ВСЕ use cases. Только titles и section — без описаний.
+
+FSD:
+${fsd.substring(0, 30000)}`;
+    const { text, truncated } = await callClaude(key, prompt, 4096);
+    if (truncated) throw new Error('FSD слишком большой. Попробуй сократить документ.');
+    return parseJson(text).items || [];
+  }
+
+  function makeBatchPrompt(fsd, batch) {
+    const list = batch.map((item, i) => `${i+1}. ${item.title} (раздел: ${item.section})`).join('\n');
+    return `Ты — аналитик требований. В FSD найди следующие use cases и извлеки полную информацию по каждому.
+
+Use cases:
+${list}
+
+Верни ТОЛЬКО JSON без markdown:
+{"use_cases": [
+  {
+    "title": "Точное название из списка",
+    "section": "Номер и название раздела, например: 3.2 Авторизация",
+    "description": "Полное описание из FSD — все детали и требования из раздела. Минимум 2-3 предложения.",
+    "actor": "Кто выполняет",
+    "preconditions": "Предусловия или пустая строка",
+    "steps": ["шаг 1", "шаг 2", "шаг 3"],
+    "expected_result": "Ожидаемый результат",
+    "priority": "High",
+    "labels": ["backend", "auth"]
+  }
+]}
+
+priority = High | Medium | Low. Верни ровно ${batch.length} объектов.
+
+FSD:
+${fsd.substring(0, 25000)}`;
+  }
+
+  async function extractUseCases() {
+    const key = document.getElementById('anthropicKey').value.trim();
+    const fsd = document.getElementById('fsdText').value.trim();
+    if (!key) { setStatus('extractStatus', 'Укажи Anthropic API key на шаге 1', 'error'); return; }
+    if (!fsd) { setStatus('extractStatus', 'Вставь текст FSD', 'error'); return; }
+
+    const btn = document.getElementById('extractBtn');
+    btn.disabled = true;
+    useCases = [];
+
+    try {
+      setStatus('extractStatus', 'Шаг 1/2: составляю список use cases...', 'loading');
+      const index = await fetchUcIndex(key, fsd);
+      if (!index.length) throw new Error('Use cases не найдены в документе');
+
+      setStatus('extractStatus', `Найдено ${index.length} use cases. Шаг 2/2: извлекаю детали...`, 'loading');
+
+      const BATCH = 5;
+      let allUC = [];
+      for (let i = 0; i < index.length; i += BATCH) {
+        const batch = index.slice(i, i + BATCH);
+        const batchNum = Math.floor(i / BATCH) + 1;
+        const totalBatches = Math.ceil(index.length / BATCH);
+        setStatus('extractStatus', `Батч ${batchNum}/${totalBatches} (use cases ${i+1}–${Math.min(i+BATCH, index.length)} из ${index.length})...`, 'loading');
+
+        const { text, truncated } = await callClaude(key, makeBatchPrompt(fsd, batch), 8192);
+        if (truncated) console.warn(`Batch ${batchNum} truncated`);
+
+        try {
+          const parsed = parseJson(text);
+          allUC = allUC.concat(parsed.use_cases || []);
+        } catch(e) {
+          console.warn(`Batch ${batchNum} parse failed:`, e.message);
+          batch.forEach(item => allUC.push({
+            title: item.title, section: item.section,
+            description: '⚠ Не удалось извлечь детали', priority: 'Medium', labels: []
+          }));
+        }
+        await new Promise(r => setTimeout(r, 200));
+      }
+
+      useCases = allUC;
+      selected = new Set(useCases.map((_, i) => i));
+      // Save to cache
+      localStorage.setItem('fsd_cached_uc', JSON.stringify(useCases));
+      localStorage.setItem('fsd_cached_fsd', fsd.substring(0, 200));
+      renderUseCases();
+      setStatus('extractStatus', `Готово: ${useCases.length} use cases ✓`, 'success');
+      goStep(3);
+    } catch(e) {
+      setStatus('extractStatus', 'Ошибка: ' + e.message, 'error');
+    }
+    btn.disabled = false;
+  }
+
+  function renderUseCases() {
+    const list = document.getElementById('ucList');
+    if (!useCases.length) {
+      list.innerHTML = '<div class="card" style="text-align:center;color:var(--text3);font-size:14px;padding:2rem;">Use cases не найдены</div>';
+      return;
+    }
+    document.getElementById('statsGrid').style.display = 'grid';
+    document.getElementById('toggleAllBtn').style.display = 'inline-flex';
+    document.getElementById('step3Actions').style.display = 'flex';
+    updateStats();
+
+    list.innerHTML = useCases.map((uc, i) => {
+      const pClass = uc.priority === 'High' ? 'badge-high' : uc.priority === 'Low' ? 'badge-low' : 'badge-medium';
+      const tags = (uc.labels||[]).map(l => `<span class="tag">${l}</span>`).join('');
+      const ch = selected.has(i);
+      return `
+      <div class="uc-card ${ch?'selected':''}" id="ucc${i}">
+        <div class="uc-header">
+          <div class="uc-check ${ch?'checked':''}" onclick="toggleUC(${i})" id="uch${i}">
+            ${ch?'<svg width="10" height="10" viewBox="0 0 12 12" fill="white"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2" fill="none"/></svg>':''}
+          </div>
+          <div class="uc-title">${uc.title}</div>
+          <span class="badge ${pClass}">${uc.priority}</span>
+        </div>
+        ${uc.section ? `<div class="uc-ref">📄 ${uc.section}</div>` : ''}
+        ${uc.description ? `<div class="uc-desc">${uc.description}</div>` : ''}
+        <div class="uc-meta">
+          ${uc.actor ? `<span class="tag">👤 ${uc.actor}</span>` : ''}
+          ${tags}
+        </div>
+        <div class="uc-details" id="ucd${i}" style="display:none">
+          ${uc.preconditions ? `<div class="uc-detail-row"><span class="uc-detail-label">Preconditions</span><span>${uc.preconditions}</span></div>` : ''}
+          ${uc.steps && uc.steps.length ? `<div class="uc-detail-row"><span class="uc-detail-label">Steps</span><ol class="uc-steps">${(uc.steps||[]).map(s=>`<li>${s}</li>`).join('')}</ol></div>` : ''}
+          ${uc.expected_result ? `<div class="uc-detail-row"><span class="uc-detail-label">Expected result</span><span>${uc.expected_result}</span></div>` : ''}
+        </div>
+        <button class="uc-toggle" onclick="toggleDetails(${i}, event)">
+          <span id="ucta${i}">▸ показать детали</span>
+        </button>
+      </div>`;
+    }).join('');
+  }
+
+  function toggleDetails(i, e) {
+    e.stopPropagation();
+    const det = document.getElementById('ucd' + i);
+    const lbl = document.getElementById('ucta' + i);
+    const open = det.style.display === 'none';
+    det.style.display = open ? 'flex' : 'none';
+    lbl.textContent = open ? '▾ скрыть детали' : '▸ показать детали';
+  }
+
+  function toggleUC(i) {
+    selected.has(i) ? selected.delete(i) : selected.add(i);
+    const card = document.getElementById('ucc'+i);
+    const check = document.getElementById('uch'+i);
+    card.classList.toggle('selected', selected.has(i));
+    check.className = 'uc-check' + (selected.has(i)?' checked':'');
+    check.innerHTML = selected.has(i) ? '<svg width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2" fill="none"/></svg>' : '';
+    updateStats();
+  }
+
+  function toggleAll() {
+    if (selected.size === useCases.length) selected.clear();
+    else useCases.forEach((_,i) => selected.add(i));
+    renderUseCases();
+  }
+
+  function updateStats() {
+    document.getElementById('statTotal').textContent = useCases.length;
+    document.getElementById('statSel').textContent = selected.size;
+    document.getElementById('statHigh').textContent = useCases.filter(u=>u.priority==='High').length;
+    document.getElementById('toggleAllTxt').textContent = selected.size===useCases.length ? 'Снять все' : 'Выбрать все';
+  }
+
+  function renderJiraPreview() {
+    const proj = document.getElementById('jiraProject').value || 'PROJ';
+    const type = document.getElementById('jiraIssueType').value;
+    document.getElementById('jiraPreviewText').textContent =
+      `${selected.size} задач будут созданы в проекте ${proj} как ${type}`;
+  }
+
+  function buildWikiMarkup(uc) {
+    const parts = [];
+    if (uc.section) parts.push(`*FSD Reference:* _${uc.section}_\n----`);
+    if (uc.description) parts.push(`*Description*\n${uc.description}`);
+    if (uc.actor) parts.push(`*Actor:* ${uc.actor}`);
+    if (uc.preconditions) parts.push(`*Preconditions:* ${uc.preconditions}`);
+    if (uc.steps && uc.steps.length) {
+      parts.push('*Steps*\n' + uc.steps.map((s,i) => `${i+1}. ${s}`).join('\n'));
+    }
+    if (uc.expected_result) parts.push(`*Expected Result*\n${uc.expected_result}`);
+    return parts.join('\n\n');
+  }
+
+  async function createIssues() {
+    const jiraUrl = document.getElementById('jiraUrl').value.trim().replace(/\/$/,'');
+    const email = document.getElementById('jiraEmail').value.trim();
+    const token = document.getElementById('jiraToken').value.trim();
+    const project = document.getElementById('jiraProject').value.trim();
+    const issueType = document.getElementById('jiraIssueType').value;
+
+    if (!jiraUrl||!email||!token||!project) {
+      document.getElementById('jiraResults').innerHTML =
+        '<div class="jira-row" style="color:var(--red)">Заполни все поля Jira на шаге 1</div>';
+      return;
+    }
+
+    const toCreate = useCases.filter((_,i) => selected.has(i));
+    if (!toCreate.length) return;
+
+    const btn = document.getElementById('createBtn');
+    btn.disabled = true;
+
+    const results = document.getElementById('jiraResults');
+    results.innerHTML = '';
+    const authType = document.getElementById('jiraAuthType').value;
+    const auth = authType === 'server'
+      ? null
+      : btoa(email + ':' + token);
+
+    for (let idx = 0; idx < toCreate.length; idx++) {
+      const uc = toCreate[idx];
+      const row = document.createElement('div');
+      row.className = 'jira-row';
+      row.innerHTML = `<span class="spin"></span> <span style="color:var(--text2);flex:1;">${uc.title}</span>`;
+      results.appendChild(row);
+
+      // Build rich ADF description
+      const adfContent = [];
+      if (uc.section) {
+        adfContent.push({ type:'paragraph', content:[
+          { type:'text', text:'FSD Reference: ', marks:[{type:'strong'}] },
+          { type:'text', text: uc.section, marks:[{type:'em'}] }
+        ]});
+        adfContent.push({ type:'rule' });
+      }
+      if (uc.description) {
+        adfContent.push({ type:'heading', attrs:{level:3}, content:[{type:'text',text:'Description'}] });
+        adfContent.push({ type:'paragraph', content:[{type:'text',text:uc.description}] });
+      }
+      if (uc.actor || uc.preconditions) {
+        adfContent.push({ type:'heading', attrs:{level:3}, content:[{type:'text',text:'Details'}] });
+        if (uc.actor) adfContent.push({ type:'paragraph', content:[
+          {type:'text',text:'Actor: ',marks:[{type:'strong'}]},{type:'text',text:uc.actor}]});
+        if (uc.preconditions) adfContent.push({ type:'paragraph', content:[
+          {type:'text',text:'Preconditions: ',marks:[{type:'strong'}]},{type:'text',text:uc.preconditions}]});
+      }
+      if (uc.steps && uc.steps.length) {
+        adfContent.push({ type:'heading', attrs:{level:3}, content:[{type:'text',text:'Steps'}] });
+        adfContent.push({ type:'orderedList', content: uc.steps.map(s=>({
+          type:'listItem', content:[{type:'paragraph',content:[{type:'text',text:s}]}]
+        }))});
+      }
+      if (uc.expected_result) {
+        adfContent.push({ type:'heading', attrs:{level:3}, content:[{type:'text',text:'Expected Result'}] });
+        adfContent.push({ type:'paragraph', content:[{type:'text',text:uc.expected_result}] });
+      }
+
+      try {
+        const proxyBase = document.getElementById('proxyUrl').value.trim().replace(/\/$/,'');
+        const jiraTarget = `${jiraUrl}/rest/api/2/issue`;
+        if (!proxyBase) {
+          throw new Error('Укажи Cloudflare Worker URL на шаге 1 — он нужен для запросов к Jira');
+        }
+        const jiraFetchUrl = `${proxyBase}?target=${encodeURIComponent(jiraTarget)}`;
+        const resp = await fetch(jiraFetchUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type':'application/json',
+            'Authorization': auth ? 'Basic ' + auth : 'Bearer ' + token
+          },
+          body: JSON.stringify({
+            fields: {
+              project: { key: project },
+              summary: uc.title,
+              description: buildWikiMarkup(uc),
+              issuetype: { name: issueType },
+              priority: { name: uc.priority==='High'?'High':uc.priority==='Low'?'Low':'Medium' },
+              labels: (uc.labels||[]).filter(l=>/^[a-zA-Z0-9_\-]+$/.test(l))
+            }
+          })
+        });
+
+        if (!resp.ok) {
+          const err = await resp.json().catch(()=>({}));
+          throw new Error(err.errorMessages?.[0] || `HTTP ${resp.status}`);
+        }
+        const data = await resp.json();
+        row.innerHTML = `
+          <svg class="icon-ok" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="9,12 12,15 16,9"/></svg>
+          <span class="jira-key">${data.key}</span>
+          <span style="flex:1;color:var(--text);">${uc.title}</span>
+          <a href="${jiraUrl}/browse/${data.key}" target="_blank" style="font-size:12px;color:var(--purple);">открыть ↗</a>`;
+      } catch(e) {
+        row.innerHTML = `
+          <svg class="icon-fail" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          <span style="flex:1;color:var(--text);">${uc.title}</span>
+          <span style="font-size:12px;color:var(--text3);">${e.message}</span>`;
+      }
+      await new Promise(r => setTimeout(r, 300));
+    }
+    btn.disabled = false;
+  }
+
+  function setStatus(id, msg, type) {
+    const el = document.getElementById(id);
+    el.className = 'status ' + type;
+    const icon = type==='loading' ? '<span class="spin"></span>' :
+                 type==='success' ? '✓' : '⚠';
+    el.innerHTML = icon + ' ' + msg;
+  }
+</script>
+</body>
+</html>
