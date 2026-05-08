@@ -442,6 +442,14 @@
             </select>
           </div>
         </div>
+        <div class="field">
+          <label>Parent issue <span style="color:var(--text3);font-weight:400;">(необязательно)</span></label>
+          <input type="text" id="jiraParent" placeholder="SVAT-123 или https://jira.company.com/browse/SVAT-123" />
+          <div class="api-note">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8"/></svg>
+            Все созданные задачи будут прилинкованы к этой задаче как дочерние
+          </div>
+        </div>
       </div>
 
       <div class="actions">
@@ -560,7 +568,7 @@
         renderUseCases();
       } catch(e) { localStorage.removeItem('fsd_cached_uc'); }
     }
-    ['anthropicKey','proxyUrl','jiraUrl','jiraEmail','jiraToken','jiraProject','jiraIssueType','jiraAuthType'].forEach(id => {
+    ['anthropicKey','proxyUrl','jiraUrl','jiraEmail','jiraToken','jiraProject','jiraIssueType','jiraAuthType','jiraParent'].forEach(id => {
       const val = localStorage.getItem('fsd_' + id);
       if (val) document.getElementById(id).value = val;
     });
@@ -580,7 +588,7 @@
   }
 
   function saveSettings() {
-    ['anthropicKey','proxyUrl','jiraUrl','jiraEmail','jiraToken','jiraProject','jiraIssueType','jiraAuthType'].forEach(id => {
+    ['anthropicKey','proxyUrl','jiraUrl','jiraEmail','jiraToken','jiraProject','jiraIssueType','jiraAuthType','jiraParent'].forEach(id => {
       localStorage.setItem('fsd_' + id, document.getElementById(id).value);
     });
   }
@@ -909,8 +917,22 @@ ${section.content.substring(0, 4000)}`;
   function renderJiraPreview() {
     const proj = document.getElementById('jiraProject').value || 'PROJ';
     const type = document.getElementById('jiraIssueType').value;
-    document.getElementById('jiraPreviewText').textContent =
-      `${selected.size} задач будут созданы в проекте ${proj} как ${type}`;
+    const parentKey = parseParentKey(document.getElementById('jiraParent').value);
+    let text = `${selected.size} задач будут созданы в проекте ${proj} как ${type}`;
+    if (parentKey) text += ` → дочерние к ${parentKey}`;
+    document.getElementById('jiraPreviewText').textContent = text;
+  }
+
+  function parseParentKey(input) {
+    if (!input) return null;
+    input = input.trim();
+    // Extract key from URL like https://jira.company.com/browse/SVAT-123
+    const urlMatch = input.match(/browse\/([A-Z]+-\d+)/i);
+    if (urlMatch) return urlMatch[1].toUpperCase();
+    // Direct key like SVAT-123
+    const keyMatch = input.match(/([A-Z]+-\d+)/i);
+    if (keyMatch) return keyMatch[1].toUpperCase();
+    return null;
   }
 
   function buildWikiMarkup(uc) {
@@ -1004,14 +1026,18 @@ ${section.content.substring(0, 4000)}`;
             'Authorization': auth ? 'Basic ' + auth : 'Bearer ' + token
           },
           body: JSON.stringify({
-            fields: {
-              project: { key: project },
-              summary: uc.title,
-              description: buildWikiMarkup(uc),
-              issuetype: { name: issueType },
-              priority: { name: uc.priority==='High'?'High':uc.priority==='Low'?'Low':'Medium' },
-              // labels excluded — not available on this Jira screen
-            }
+            fields: (() => {
+              const fields = {
+                project: { key: project },
+                summary: uc.title,
+                description: buildWikiMarkup(uc),
+                issuetype: { name: issueType },
+                priority: { name: uc.priority==='High'?'High':uc.priority==='Low'?'Low':'Medium' },
+              };
+              const parentKey = parseParentKey(document.getElementById('jiraParent').value);
+              if (parentKey) fields.parent = { key: parentKey };
+              return fields;
+            })()
           })
         });
 
