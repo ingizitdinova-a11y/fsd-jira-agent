@@ -1052,7 +1052,7 @@ ${section.content.substring(0, 4000)}`;
               method: 'POST',
               headers: { 'Content-Type':'application/json', 'Authorization': auth ? 'Basic ' + auth : 'Bearer ' + token },
               body: JSON.stringify({
-                type: { name: 'Hierarchy' },
+                type: { name: 'Parent' },
                 inwardIssue: { key: data.key },
                 outwardIssue: { key: parentKey }
               })
