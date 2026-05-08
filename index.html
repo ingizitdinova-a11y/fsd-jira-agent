@@ -529,7 +529,7 @@
 
       <div class="actions" id="step3SecActions" style="display:none">
         <button class="btn" onclick="goStep(2)">← Назад</button>
-        <button class="btn btn-primary" onclick="startExtraction()">
+        <button class="btn btn-primary" onclick="startExtraction()" id="startExtractionBtn">
           ✦ Извлечь use cases из выбранных разделов →
         </button>
         <span class="status" id="secExtractStatus"></span>
@@ -883,7 +883,7 @@ ${section.content.substring(0, 4000)}`;
     const toProcess = sections.filter((_, i) => selectedSections.has(i));
     if (!toProcess.length) { setStatus('secExtractStatus', 'Выбери хотя бы один раздел', 'error'); return; }
 
-    const btn = document.querySelector('#step3SecActions .btn-primary');
+    const btn = document.getElementById('startExtractionBtn');
     btn.disabled = true;
     useCases = [];
 
